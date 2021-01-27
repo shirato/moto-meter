@@ -25,7 +25,7 @@ volatile unsigned long prevTime = 0;
 void IRAM_ATTR calcDuration()
 {
   unsigned long currentTime = micros();
-  frequency = 1000000.0 /(currentTime - prevTime);
+  frequency = 1000000.0 / (currentTime - prevTime);
   prevTime = currentTime;
 }
 
