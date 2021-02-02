@@ -12,17 +12,27 @@
 
 #define BLYNK_USE_DIRECT_CONNECT
 
+#define VP_DISP_SPEED       V0
+#define VP_DISP_REV         V1
+#define VP_DISP_SPEED_FREQ  V2
+#define VP_DISP_REV_FREQ    V3
+#define VP_STEP_SPEED       V4
+#define VP_STEP_REV         V5
+#define VP_BUTTON_SAVE      V6
+#define VP_DISP_TERM        V7
+
 char auth[] = AUTH_TOKEN;
 
 typedef struct
 {
   float frequency;
   unsigned long prevTime;
+  int scaleFactor;
 } pulse;
 
 Preferences preferences;
 
-// WidgetTerminal terminal(V1);
+WidgetTerminal terminal(VP_DISP_TERM);
 BlynkTimer timer;
 
 // the number of the signal input pin
@@ -30,61 +40,67 @@ const int inputPin_speed = 16;
 const int inputPin_tacho = 17;
 
 // We make these values volatile, as they are used in interrupt context
-volatile pulse pulse_speed = {0, 0};
-volatile pulse pulse_tacho = {0, 0};
-
-int speedFreqRatio; // [m/h/Hz]
-int revFreqRatio;   // [rpm/Hz]
+volatile pulse pulse_speed = {0, 0, 1};
+volatile pulse pulse_tacho = {0, 0, 1};
 
 // Most boards won't send data to WiFi out of interrupt handler.
 // We just store the value and process it in the main loop.
 void IRAM_ATTR calcFrequency_speed()
 {
   unsigned long currentTime = micros();
-  pulse_speed.frequency = 1000000.0 / (currentTime - pulse_speed.prevTime);
-  pulse_speed.prevTime = currentTime;
+  if ((currentTime - pulse_speed.prevTime) > 100) // if wave length is less than 100 us, regarded as noise.
+  {
+    pulse_speed.frequency = 1000000.0 / (currentTime - pulse_speed.prevTime);
+    pulse_speed.prevTime = currentTime;
+  }
 }
 
 void IRAM_ATTR calcFrequency_tacho()
 {
   unsigned long currentTime = micros();
-  pulse_tacho.frequency = 1000000.0 / (currentTime - pulse_tacho.prevTime);
-  pulse_tacho.prevTime = currentTime;
+  if ((currentTime - pulse_tacho.prevTime) > 100) // if wave length is less than 100 us, regarded as noise.
+  {
+    pulse_tacho.frequency = 1000000.0 / (currentTime - pulse_tacho.prevTime);
+    pulse_tacho.prevTime = currentTime;
+  }
 }
 
 void sendValue()
 {
   // Serial.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
-  Blynk.virtualWrite(V2, pulse_speed.frequency);
-  Blynk.virtualWrite(V3, pulse_tacho.frequency);
+
+  Blynk.virtualWrite(VP_DISP_SPEED, (int)(pulse_speed.frequency * pulse_speed.scaleFactor / 1000));
+  Blynk.virtualWrite(VP_DISP_REV, (int)(pulse_tacho.frequency * pulse_tacho.scaleFactor));
+  Blynk.virtualWrite(VP_DISP_SPEED_FREQ, pulse_speed.frequency);
+  Blynk.virtualWrite(VP_DISP_REV_FREQ, pulse_tacho.frequency);
   // terminal.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
 }
 
-BLYNK_WRITE(V4)
+BLYNK_WRITE(VP_STEP_SPEED)
 {
-  if (speedFreqRatio + param.asInt() > 0)
+  if (pulse_speed.scaleFactor + param.asInt() > 0)
   {
-    speedFreqRatio += param.asInt();
-    Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", speedFreqRatio);
+    pulse_speed.scaleFactor += param.asInt();
+    Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", pulse_speed.scaleFactor);
   }
 }
 
-BLYNK_WRITE(V5)
+BLYNK_WRITE(VP_STEP_REV)
 {
-  if ((revFreqRatio + param.asInt()) > 0)
+  if (pulse_tacho.scaleFactor + param.asInt() > 0)
   {
-    revFreqRatio += param.asInt();
-    Serial.printf("revFreqRatio = %d [rpm/Hz]\n", revFreqRatio);
+    pulse_tacho.scaleFactor += param.asInt();
+    Serial.printf("revFreqRatio = %d [rpm/Hz]\n", pulse_tacho.scaleFactor);
   }
 }
 
-BLYNK_WRITE(V6)
+BLYNK_WRITE(VP_BUTTON_SAVE)
 {
-  if(param.asInt() == 1)
+  if (param.asInt() == 1)
   {
     preferences.begin("moto-meter", false);
-    preferences.putUInt("speedFreqRatio", speedFreqRatio);
-    preferences.putUInt("revFreqRatio", revFreqRatio);
+    preferences.putUInt("speedFreqRatio", pulse_speed.scaleFactor);
+    preferences.putUInt("revFreqRatio", pulse_tacho.scaleFactor);
     preferences.end();
     Serial.println("preferences saved.");
   }
@@ -109,12 +125,12 @@ void setup()
   timer.setInterval(100L, sendValue);
 
   preferences.begin("moto-meter", true);
-  speedFreqRatio = preferences.getUInt("speedFreqRatio", 1);
-  revFreqRatio = preferences.getUInt("revFreqRatio", 1);
+  pulse_speed.scaleFactor = preferences.getUInt("speedFreqRatio", 135); // default scale factor of speed : 135 [mph/Hz]
+  pulse_tacho.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
   preferences.end();
 
-  Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", speedFreqRatio);
-  Serial.printf("revFreqRatio = %d [rpm/Hz]\n", revFreqRatio);
+  Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", pulse_speed.scaleFactor);
+  Serial.printf("revFreqRatio = %d [rpm/Hz]\n", pulse_tacho.scaleFactor);
 }
 
 void loop()
