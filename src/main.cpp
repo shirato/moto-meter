@@ -3,23 +3,24 @@
 
 #include <Preferences.h>
 
-#include <BlynkSimpleEsp32_BLE.h>
-#include <BLEDevice.h>
-#include <BLEServer.h>
-
 /* Comment this out to disable prints and save space */
+/* Insert before blynk libraries */
 #define BLYNK_PRINT Serial
 
 #define BLYNK_USE_DIRECT_CONNECT
 
-#define VP_DISP_SPEED       V0
-#define VP_DISP_REV         V1
-#define VP_DISP_SPEED_FREQ  V2
-#define VP_DISP_REV_FREQ    V3
-#define VP_STEP_SPEED       V4
-#define VP_STEP_REV         V5
-#define VP_BUTTON_SAVE      V6
-#define VP_DISP_TERM        V7
+#include <BlynkSimpleEsp32_BLE.h>
+#include <BLEDevice.h>
+#include <BLEServer.h>
+
+#define VP_DISP_SPEED V0
+#define VP_DISP_REV V1
+#define VP_DISP_SPEED_FREQ V2
+#define VP_DISP_REV_FREQ V3
+#define VP_STEP_SPEED V4
+#define VP_STEP_REV V5
+#define VP_BUTTON_SAVE V6
+#define VP_DISP_TERM V7
 
 char auth[] = AUTH_TOKEN;
 
@@ -48,7 +49,7 @@ volatile pulse pulse_tacho = {0, 0, 1};
 void IRAM_ATTR calcFrequency_speed()
 {
   unsigned long currentTime = micros();
-  if ((currentTime - pulse_speed.prevTime) > 100) // if wave length is less than 100 us, regarded as noise.
+  if ((currentTime - pulse_speed.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
   {
     pulse_speed.frequency = 1000000.0 / (currentTime - pulse_speed.prevTime);
     pulse_speed.prevTime = currentTime;
@@ -58,7 +59,7 @@ void IRAM_ATTR calcFrequency_speed()
 void IRAM_ATTR calcFrequency_tacho()
 {
   unsigned long currentTime = micros();
-  if ((currentTime - pulse_tacho.prevTime) > 100) // if wave length is less than 100 us, regarded as noise.
+  if ((currentTime - pulse_tacho.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
   {
     pulse_tacho.frequency = 1000000.0 / (currentTime - pulse_tacho.prevTime);
     pulse_tacho.prevTime = currentTime;
@@ -69,11 +70,21 @@ void sendValue()
 {
   // Serial.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
 
-  Blynk.virtualWrite(VP_DISP_SPEED, (int)(pulse_speed.frequency * pulse_speed.scaleFactor / 1000));
+  // Blynk.virtualWrite(VP_DISP_SPEED, (int)(pulse_speed.frequency * pulse_speed.scaleFactor / 1000));
+  Blynk.virtualWrite(VP_DISP_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
   Blynk.virtualWrite(VP_DISP_REV, (int)(pulse_tacho.frequency * pulse_tacho.scaleFactor));
   Blynk.virtualWrite(VP_DISP_SPEED_FREQ, pulse_speed.frequency);
   Blynk.virtualWrite(VP_DISP_REV_FREQ, pulse_tacho.frequency);
   // terminal.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
+}
+
+BLYNK_CONNECTED()
+{
+  Blynk.virtualWrite(VP_DISP_SPEED,0);
+  Blynk.virtualWrite(VP_DISP_REV, 0);
+  Blynk.virtualWrite(VP_DISP_SPEED_FREQ, pulse_speed.scaleFactor);
+  Blynk.virtualWrite(VP_DISP_REV_FREQ, pulse_tacho.scaleFactor);
+  delay(5000);
 }
 
 BLYNK_WRITE(VP_STEP_SPEED)
