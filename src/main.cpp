@@ -80,11 +80,7 @@ void sendValue()
 
 BLYNK_CONNECTED()
 {
-  Blynk.virtualWrite(VP_DISP_SPEED,0);
-  Blynk.virtualWrite(VP_DISP_REV, 0);
-  Blynk.virtualWrite(VP_DISP_SPEED_FREQ, pulse_speed.scaleFactor);
-  Blynk.virtualWrite(VP_DISP_REV_FREQ, pulse_tacho.scaleFactor);
-  delay(5000);
+  Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
 }
 
 BLYNK_WRITE(VP_STEP_SPEED)
@@ -92,7 +88,7 @@ BLYNK_WRITE(VP_STEP_SPEED)
   if (pulse_speed.scaleFactor + param.asInt() > 0)
   {
     pulse_speed.scaleFactor += param.asInt();
-    Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", pulse_speed.scaleFactor);
+    Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
   }
 }
 
@@ -101,7 +97,7 @@ BLYNK_WRITE(VP_STEP_REV)
   if (pulse_tacho.scaleFactor + param.asInt() > 0)
   {
     pulse_tacho.scaleFactor += param.asInt();
-    Serial.printf("revFreqRatio = %d [rpm/Hz]\n", pulse_tacho.scaleFactor);
+    Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
   }
 }
 
@@ -140,8 +136,8 @@ void setup()
   pulse_tacho.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
   preferences.end();
 
-  Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", pulse_speed.scaleFactor);
-  Serial.printf("revFreqRatio = %d [rpm/Hz]\n", pulse_tacho.scaleFactor);
+  // Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", pulse_speed.scaleFactor);
+  // Serial.printf("revFreqRatio = %d [rpm/Hz]\n", pulse_tacho.scaleFactor);
 }
 
 void loop()
