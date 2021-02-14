@@ -4,7 +4,7 @@
 #include <Preferences.h>
 
 /* Uncomment below line to change to scale factor adjusting mode. Note that blynk widgets should be changed too. */
-#define ADJUST_MODE
+// #define ADJUST_MODE
 
 /* Comment this out to disable prints and save space */
 /* Insert before blynk libraries */
@@ -16,6 +16,11 @@
 #include <BLEDevice.h>
 #include <BLEServer.h>
 
+// Virtual pin setting
+#define VP_GAUGE_SPEED V0
+#define VP_GAUGE_REV V1
+#define VP_LED V2
+#define VP_VALUE_POSITION V3
 
 #ifdef ADJUST_MODE
 #define VP_DISP_SPEED V0
@@ -39,14 +44,18 @@ typedef struct
 Preferences preferences;
 
 BlynkTimer timer;
+WidgetLED led_neutral(VP_LED);
 
 // the number of the signal input pin
 const int inputPin_speed = 16;
 const int inputPin_tacho = 17;
+const int inputPin_neutral = 32;
+const int outputPin_ind = 33;
 
 // We make these values volatile, as they are used in interrupt context
 volatile pulse pulse_speed = {0, 0, 1};
 volatile pulse pulse_tacho = {0, 0, 1};
+volatile int neutralState = 0;
 
 // Most boards won't send data to WiFi out of interrupt handler.
 // We just store the value and process it in the main loop.
@@ -70,11 +79,25 @@ void IRAM_ATTR calcFrequency_tacho()
   }
 }
 
+void IRAM_ATTR checkNeutral()
+{
+  neutralState = digitalRead(inputPin_neutral);
+}
+
 void sendValue()
 {
+  Blynk.virtualWrite(VP_GAUGE_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
+  Blynk.virtualWrite(VP_GAUGE_REV, pulse_tacho.frequency * pulse_tacho.scaleFactor / 1000);
+  if (neutralState)
+  {
+    Blynk.virtualWrite(VP_VALUE_POSITION, "N");
+    led_neutral.on();
+  }else{
+    Blynk.virtualWrite(VP_VALUE_POSITION, 0);
+    led_neutral.off();
+  }
   // Serial.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
 
-  // Blynk.virtualWrite(VP_DISP_SPEED, (int)(pulse_speed.frequency * pulse_speed.scaleFactor / 1000));
 #ifdef ADJUST_MODE
   Blynk.virtualWrite(VP_DISP_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
   Blynk.virtualWrite(VP_DISP_REV, (int)(pulse_tacho.frequency * pulse_tacho.scaleFactor));
@@ -138,9 +161,11 @@ void setup()
   // Make input pin HIGH by default
   pinMode(inputPin_speed, INPUT_PULLUP);
   pinMode(inputPin_tacho, INPUT_PULLUP);
+  pinMode(inputPin_neutral, INPUT_PULLUP);
   // Attach INT to our handler
   attachInterrupt(digitalPinToInterrupt(inputPin_speed), calcFrequency_speed, RISING);
   attachInterrupt(digitalPinToInterrupt(inputPin_tacho), calcFrequency_tacho, RISING);
+  attachInterrupt(digitalPinToInterrupt(inputPin_neutral), checkNeutral, CHANGE);
 
   timer.setInterval(100L, sendValue);
 
