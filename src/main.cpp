@@ -4,7 +4,7 @@
 #include <Preferences.h>
 
 /* Uncomment below line to change to scale factor adjusting mode. Note that blynk widgets should be changed too. */
-// #define ADJUST_MODE
+#define ADJUST_MODE
 
 /* Comment this out to disable prints and save space */
 /* Insert before blynk libraries */
