@@ -3,6 +3,9 @@
 
 #include <Preferences.h>
 
+/* Uncomment below line to change to scale factor adjusting mode. Note that blynk widgets should be changed too. */
+#define ADJUST_MODE
+
 /* Comment this out to disable prints and save space */
 /* Insert before blynk libraries */
 #define BLYNK_PRINT Serial
@@ -15,12 +18,14 @@
 
 #define VP_DISP_SPEED V0
 #define VP_DISP_REV V1
+
+#ifdef ADJUST_MODE
 #define VP_DISP_SPEED_FREQ V2
 #define VP_DISP_REV_FREQ V3
 #define VP_STEP_SPEED V4
 #define VP_STEP_REV V5
 #define VP_BUTTON_SAVE V6
-#define VP_DISP_TERM V7
+#endif
 
 char auth[] = AUTH_TOKEN;
 
@@ -33,7 +38,6 @@ typedef struct
 
 Preferences preferences;
 
-WidgetTerminal terminal(VP_DISP_TERM);
 BlynkTimer timer;
 
 // the number of the signal input pin
@@ -73,16 +77,20 @@ void sendValue()
   // Blynk.virtualWrite(VP_DISP_SPEED, (int)(pulse_speed.frequency * pulse_speed.scaleFactor / 1000));
   Blynk.virtualWrite(VP_DISP_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
   Blynk.virtualWrite(VP_DISP_REV, (int)(pulse_tacho.frequency * pulse_tacho.scaleFactor));
+#ifdef ADJUST_MODE
   Blynk.virtualWrite(VP_DISP_SPEED_FREQ, pulse_speed.frequency);
   Blynk.virtualWrite(VP_DISP_REV_FREQ, pulse_tacho.frequency);
-  // terminal.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
+#endif
 }
 
 BLYNK_CONNECTED()
 {
+#ifdef ADJUST_MODE
   Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
+#endif
 }
 
+#ifdef ADJUST_MODE
 BLYNK_WRITE(VP_STEP_SPEED)
 {
   if (pulse_speed.scaleFactor + param.asInt() > 0)
@@ -91,7 +99,9 @@ BLYNK_WRITE(VP_STEP_SPEED)
     Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
   }
 }
+#endif
 
+#ifdef ADJUST_MODE
 BLYNK_WRITE(VP_STEP_REV)
 {
   if (pulse_tacho.scaleFactor + param.asInt() > 0)
@@ -100,7 +110,9 @@ BLYNK_WRITE(VP_STEP_REV)
     Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
   }
 }
+#endif
 
+#ifdef ADJUST_MODE
 BLYNK_WRITE(VP_BUTTON_SAVE)
 {
   if (param.asInt() == 1)
@@ -112,6 +124,7 @@ BLYNK_WRITE(VP_BUTTON_SAVE)
     Serial.println("preferences saved.");
   }
 }
+#endif
 
 void setup()
 {
@@ -135,9 +148,6 @@ void setup()
   pulse_speed.scaleFactor = preferences.getUInt("speedFreqRatio", 135); // default scale factor of speed : 135 [mph/Hz]
   pulse_tacho.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
   preferences.end();
-
-  // Serial.printf("speedFreqRatio = %d [m/h/Hz]\n", pulse_speed.scaleFactor);
-  // Serial.printf("revFreqRatio = %d [rpm/Hz]\n", pulse_tacho.scaleFactor);
 }
 
 void loop()
