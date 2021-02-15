@@ -102,24 +102,25 @@ void sendValue()
 
   if (isNeutral)
   {
-    Blynk.setProperty(VP_VALUE_POSITION, "color", "#23C48E");
+    Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_GREEN);
     Blynk.virtualWrite(VP_VALUE_POSITION, "N");
   }
   else
   {
-    Blynk.setProperty(VP_VALUE_POSITION, "color", "#000000");
-    boolean send = false;
+    boolean topGear = true;
     for (int i = 0; i < NUM_SHIFTPOSITION - 1; i++)
     {
       if (ratio < (SPRatio[i] + SPRatio[i + 1]) / 2)
       {
+        Blynk.setProperty(VP_VALUE_POSITION, "color", "#000000");
         Blynk.virtualWrite(VP_VALUE_POSITION, i + 1);
-        send = true;
+        topGear = false;
         break;
       }
     }
-    if (!send)
+    if (topGear)
     {
+      Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_YELLOW);
       Blynk.virtualWrite(VP_VALUE_POSITION, NUM_SHIFTPOSITION);
     }
   }
