@@ -1,7 +1,7 @@
 #include <Arduino.h>
-#include "UserSettings.h"
-
 #include <Preferences.h>
+
+#include "UserSettings.h"
 
 /* Uncomment below line to change to scale factor adjusting mode. Note that blynk widgets should be changed too. */
 // #define ADJUST_MODE
@@ -19,8 +19,10 @@
 // Virtual pin setting
 #define VP_GAUGE_SPEED V0
 #define VP_GAUGE_REV V1
-#define VP_LED V2
+#define VP_VALUE_RATIO V2
 #define VP_VALUE_POSITION V3
+
+#define NUM_SHIFTPOSITION 5
 
 #ifdef ADJUST_MODE
 #define VP_DISP_SPEED V0
@@ -32,8 +34,6 @@
 #define VP_BUTTON_SAVE V6
 #endif
 
-char auth[] = AUTH_TOKEN;
-
 typedef struct
 {
   float frequency;
@@ -42,9 +42,12 @@ typedef struct
 } pulse;
 
 Preferences preferences;
-
 BlynkTimer timer;
-WidgetLED led_neutral(VP_LED);
+
+char auth[] = AUTH_TOKEN;
+
+// set speed-to-rev ratio for each shift position (speed / rev * 1000)
+const float SPRatio[NUM_SHIFTPOSITION] = {5.010, 7.607, 9.958, 12.324, 14.189};
 
 // the number of the signal input pin
 const int inputPin_speed = 16;
@@ -55,10 +58,8 @@ const int outputPin_ind = 33;
 // We make these values volatile, as they are used in interrupt context
 volatile pulse pulse_speed = {0, 0, 1};
 volatile pulse pulse_tacho = {0, 0, 1};
-volatile int neutralState = 0;
+volatile int isNeutral = false;
 
-// Most boards won't send data to WiFi out of interrupt handler.
-// We just store the value and process it in the main loop.
 void IRAM_ATTR calcFrequency_speed()
 {
   unsigned long currentTime = micros();
@@ -81,22 +82,47 @@ void IRAM_ATTR calcFrequency_tacho()
 
 void IRAM_ATTR checkNeutral()
 {
-  neutralState = digitalRead(inputPin_neutral);
+  isNeutral = digitalRead(inputPin_neutral);
 }
 
 void sendValue()
 {
-  Blynk.virtualWrite(VP_GAUGE_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
-  Blynk.virtualWrite(VP_GAUGE_REV, pulse_tacho.frequency * pulse_tacho.scaleFactor / 1000);
-  if (neutralState)
+  float speed = pulse_speed.frequency * pulse_speed.scaleFactor; // speed [m/h]
+  float rev = pulse_tacho.frequency * pulse_tacho.scaleFactor;   // rev [rpm]
+  float ratio = 0;
+
+  if ((int)rev)
   {
-    Blynk.virtualWrite(VP_VALUE_POSITION, "N");
-    led_neutral.on();
-  }else{
-    Blynk.virtualWrite(VP_VALUE_POSITION, 0);
-    led_neutral.off();
+    ratio = speed / rev;
   }
-  // Serial.printf("speed = %f [Hz]\t tacho = %f [Hz]\n", pulse_speed.frequency, pulse_tacho.frequency);
+
+  Blynk.virtualWrite(VP_GAUGE_SPEED, speed / 1000);
+  Blynk.virtualWrite(VP_GAUGE_REV, rev / 1000);
+  Blynk.virtualWrite(VP_VALUE_RATIO, ratio);
+
+  if (isNeutral)
+  {
+    Blynk.setProperty(VP_VALUE_POSITION, "color", "#23C48E");
+    Blynk.virtualWrite(VP_VALUE_POSITION, "N");
+  }
+  else
+  {
+    Blynk.setProperty(VP_VALUE_POSITION, "color", "#000000");
+    boolean send = false;
+    for (int i = 0; i < NUM_SHIFTPOSITION - 1; i++)
+    {
+      if (ratio < (SPRatio[i] + SPRatio[i + 1]) / 2)
+      {
+        Blynk.virtualWrite(VP_VALUE_POSITION, i + 1);
+        send = true;
+        break;
+      }
+    }
+    if (!send)
+    {
+      Blynk.virtualWrite(VP_VALUE_POSITION, NUM_SHIFTPOSITION);
+    }
+  }
 
 #ifdef ADJUST_MODE
   Blynk.virtualWrite(VP_DISP_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
@@ -122,9 +148,7 @@ BLYNK_WRITE(VP_STEP_SPEED)
     Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
   }
 }
-#endif
 
-#ifdef ADJUST_MODE
 BLYNK_WRITE(VP_STEP_REV)
 {
   if (pulse_tacho.scaleFactor + param.asInt() > 0)
@@ -133,9 +157,7 @@ BLYNK_WRITE(VP_STEP_REV)
     Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
   }
 }
-#endif
 
-#ifdef ADJUST_MODE
 BLYNK_WRITE(VP_BUTTON_SAVE)
 {
   if (param.asInt() == 1)
@@ -158,10 +180,16 @@ void setup()
   Blynk.setDeviceName("Blynk_ESP32");
   Blynk.begin(auth);
 
+  preferences.begin("moto-meter", true);
+  pulse_speed.scaleFactor = preferences.getUInt("speedFreqRatio", 135); // default scale factor of speed : 135 [mph/Hz]
+  pulse_tacho.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
+  preferences.end();
+
   // Make input pin HIGH by default
   pinMode(inputPin_speed, INPUT_PULLUP);
   pinMode(inputPin_tacho, INPUT_PULLUP);
   pinMode(inputPin_neutral, INPUT_PULLUP);
+
   // Attach INT to our handler
   attachInterrupt(digitalPinToInterrupt(inputPin_speed), calcFrequency_speed, RISING);
   attachInterrupt(digitalPinToInterrupt(inputPin_tacho), calcFrequency_tacho, RISING);
@@ -169,10 +197,7 @@ void setup()
 
   timer.setInterval(100L, sendValue);
 
-  preferences.begin("moto-meter", true);
-  pulse_speed.scaleFactor = preferences.getUInt("speedFreqRatio", 135); // default scale factor of speed : 135 [mph/Hz]
-  pulse_tacho.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
-  preferences.end();
+  BLYNK_LOG("speedFreqRatio=%d\trevFreqRatio=%d\n", pulse_speed.scaleFactor, pulse_tacho.scaleFactor);
 }
 
 void loop()
