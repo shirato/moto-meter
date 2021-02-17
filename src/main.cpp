@@ -135,6 +135,12 @@ void sendValue()
 
 BLYNK_CONNECTED()
 {
+  Blynk.virtualWrite(VP_GAUGE_SPEED, pulse_speed.scaleFactor);
+  Blynk.virtualWrite(VP_GAUGE_REV, pulse_tacho.scaleFactor);
+  Blynk.virtualWrite(VP_VALUE_RATIO, "Connected");
+  Blynk.virtualWrite(VP_VALUE_POSITION, "!");
+  delay(3000);
+
 #ifdef ADJUST_MODE
   Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
 #endif
