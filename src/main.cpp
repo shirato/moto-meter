@@ -135,10 +135,16 @@ void sendValue()
 
 BLYNK_CONNECTED()
 {
-  Blynk.virtualWrite(VP_GAUGE_SPEED, pulse_speed.scaleFactor);
-  Blynk.virtualWrite(VP_GAUGE_REV, pulse_tacho.scaleFactor);
+  Blynk.virtualWrite(VP_GAUGE_SPEED, 0);
+  // Blynk.virtualWrite(VP_GAUGE_SPEED, pulse_speed.scaleFactor);
+  Blynk.virtualWrite(VP_GAUGE_REV, 0);
+  // Blynk.virtualWrite(VP_GAUGE_REV, pulse_tacho.scaleFactor);
   Blynk.virtualWrite(VP_VALUE_RATIO, "Connected");
-  Blynk.virtualWrite(VP_VALUE_POSITION, "!");
+  Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_GREEN);
+  Blynk.virtualWrite(VP_VALUE_POSITION, "N");
+  // Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_YELLOW);
+  // Blynk.virtualWrite(VP_VALUE_POSITION, NUM_SHIFTPOSITION);
+
   delay(3000);
 
 #ifdef ADJUST_MODE
