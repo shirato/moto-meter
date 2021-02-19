@@ -22,7 +22,7 @@
 #define VP_VALUE_RATIO V2
 #define VP_VALUE_POSITION V3
 
-#define NUM_SHIFTPOSITION 5
+#define GEAR_NUM 5
 
 #ifdef ADJUST_MODE
 #define VP_DISP_SPEED V0
@@ -39,7 +39,7 @@ typedef struct
   float frequency;
   unsigned long prevTime;
   int scaleFactor;
-} pulse;
+} Pulse;
 
 Preferences preferences;
 BlynkTimer timer;
@@ -47,58 +47,58 @@ BlynkTimer timer;
 char auth[] = AUTH_TOKEN;
 
 // set speed-to-rev ratio for each shift position (speed / rev * 1000)
-const float SPRatio[NUM_SHIFTPOSITION] = {5.010, 7.607, 9.958, 12.324, 14.189};
+const float speedToRevRatioArray[GEAR_NUM] = {5.010, 7.607, 9.958, 12.324, 14.189};
 
 // the number of the signal input pin
-const int inputPin_speed = 16;
-const int inputPin_tacho = 17;
-const int inputPin_neutral = 32;
-const int outputPin_ind = 33;
+const int speedPin = 16;
+const int tachoPin = 17;
+const int neutralPin = 32;
+const int indicatorPin = 33;
 
 // We make these values volatile, as they are used in interrupt context
-volatile pulse pulse_speed = {0, 0, 1};
-volatile pulse pulse_tacho = {0, 0, 1};
+volatile Pulse speedPulse = {0, 0, 1};
+volatile Pulse tachoPulse = {0, 0, 1};
 volatile int isNeutral = false;
 
-void IRAM_ATTR calcFrequency_speed()
+void IRAM_ATTR calcSpeedFrequency()
 {
   unsigned long currentTime = micros();
-  if ((currentTime - pulse_speed.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+  if ((currentTime - speedPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
   {
-    pulse_speed.frequency = 1000000.0 / (currentTime - pulse_speed.prevTime);
-    pulse_speed.prevTime = currentTime;
+    speedPulse.frequency = 1000000.0 / (currentTime - speedPulse.prevTime);
+    speedPulse.prevTime = currentTime;
   }
 }
 
-void IRAM_ATTR calcFrequency_tacho()
+void IRAM_ATTR calcTachoFrequency()
 {
   unsigned long currentTime = micros();
-  if ((currentTime - pulse_tacho.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+  if ((currentTime - tachoPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
   {
-    pulse_tacho.frequency = 1000000.0 / (currentTime - pulse_tacho.prevTime);
-    pulse_tacho.prevTime = currentTime;
+    tachoPulse.frequency = 1000000.0 / (currentTime - tachoPulse.prevTime);
+    tachoPulse.prevTime = currentTime;
   }
 }
 
-void IRAM_ATTR checkNeutral()
+void IRAM_ATTR checkNeutralState()
 {
-  isNeutral = digitalRead(inputPin_neutral);
+  isNeutral = digitalRead(neutralPin);
 }
 
 void sendValue()
 {
-  float speed = pulse_speed.frequency * pulse_speed.scaleFactor; // speed [m/h]
-  float rev = pulse_tacho.frequency * pulse_tacho.scaleFactor;   // rev [rpm]
-  float ratio = 0;
+  float speed = speedPulse.frequency * speedPulse.scaleFactor; // speed [m/h]
+  float rev = tachoPulse.frequency * tachoPulse.scaleFactor;   // rev [rpm]
+  float speedToRevRatio = 0;
 
   if ((int)rev)
   {
-    ratio = speed / rev;
+    speedToRevRatio = speed / rev;
   }
 
   Blynk.virtualWrite(VP_GAUGE_SPEED, speed / 1000);
   Blynk.virtualWrite(VP_GAUGE_REV, rev / 1000);
-  Blynk.virtualWrite(VP_VALUE_RATIO, ratio);
+  Blynk.virtualWrite(VP_VALUE_RATIO, speedToRevRatio);
 
   if (isNeutral)
   {
@@ -108,9 +108,9 @@ void sendValue()
   else
   {
     boolean topGear = true;
-    for (int i = 0; i < NUM_SHIFTPOSITION - 1; i++)
+    for (int i = 0; i < GEAR_NUM - 1; i++)
     {
-      if (ratio < (SPRatio[i] + SPRatio[i + 1]) / 2)
+      if (speedToRevRatio < (speedToRevRatioArray[i] + speedToRevRatioArray[i + 1]) / 2)
       {
         Blynk.setProperty(VP_VALUE_POSITION, "color", "#000000");
         Blynk.virtualWrite(VP_VALUE_POSITION, i + 1);
@@ -121,53 +121,53 @@ void sendValue()
     if (topGear)
     {
       Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_YELLOW);
-      Blynk.virtualWrite(VP_VALUE_POSITION, NUM_SHIFTPOSITION);
+      Blynk.virtualWrite(VP_VALUE_POSITION, GEAR_NUM);
     }
   }
 
 #ifdef ADJUST_MODE
-  Blynk.virtualWrite(VP_DISP_SPEED, pulse_speed.frequency * pulse_speed.scaleFactor / 1000);
-  Blynk.virtualWrite(VP_DISP_REV, (int)(pulse_tacho.frequency * pulse_tacho.scaleFactor));
-  Blynk.virtualWrite(VP_DISP_SPEED_FREQ, pulse_speed.frequency);
-  Blynk.virtualWrite(VP_DISP_REV_FREQ, pulse_tacho.frequency);
+  Blynk.virtualWrite(VP_DISP_SPEED, speedPulse.frequency * speedPulse.scaleFactor / 1000);
+  Blynk.virtualWrite(VP_DISP_REV, (int)(tachoPulse.frequency * tachoPulse.scaleFactor));
+  Blynk.virtualWrite(VP_DISP_SPEED_FREQ, speedPulse.frequency);
+  Blynk.virtualWrite(VP_DISP_REV_FREQ, tachoPulse.frequency);
 #endif
 }
 
 BLYNK_CONNECTED()
 {
   Blynk.virtualWrite(VP_GAUGE_SPEED, 0);
-  // Blynk.virtualWrite(VP_GAUGE_SPEED, pulse_speed.scaleFactor);
+  // Blynk.virtualWrite(VP_GAUGE_SPEED, speedPulse.scaleFactor);
   Blynk.virtualWrite(VP_GAUGE_REV, 0);
-  // Blynk.virtualWrite(VP_GAUGE_REV, pulse_tacho.scaleFactor);
+  // Blynk.virtualWrite(VP_GAUGE_REV, tachoPulse.scaleFactor);
   Blynk.virtualWrite(VP_VALUE_RATIO, "Connected");
   Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_GREEN);
   Blynk.virtualWrite(VP_VALUE_POSITION, "N");
   // Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_YELLOW);
-  // Blynk.virtualWrite(VP_VALUE_POSITION, NUM_SHIFTPOSITION);
+  // Blynk.virtualWrite(VP_VALUE_POSITION, GEAR_NUM);
 
   delay(3000);
 
 #ifdef ADJUST_MODE
-  Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
+  Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(speedPulse.scaleFactor) + " / " + String(tachoPulse.scaleFactor));
 #endif
 }
 
 #ifdef ADJUST_MODE
 BLYNK_WRITE(VP_STEP_SPEED)
 {
-  if (pulse_speed.scaleFactor + param.asInt() > 0)
+  if (speedPulse.scaleFactor + param.asInt() > 0)
   {
-    pulse_speed.scaleFactor += param.asInt();
-    Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
+    speedPulse.scaleFactor += param.asInt();
+    Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(speedPulse.scaleFactor) + " / " + String(tachoPulse.scaleFactor));
   }
 }
 
 BLYNK_WRITE(VP_STEP_REV)
 {
-  if (pulse_tacho.scaleFactor + param.asInt() > 0)
+  if (tachoPulse.scaleFactor + param.asInt() > 0)
   {
-    pulse_tacho.scaleFactor += param.asInt();
-    Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(pulse_speed.scaleFactor) + " / " + String(pulse_tacho.scaleFactor));
+    tachoPulse.scaleFactor += param.asInt();
+    Blynk.setProperty(VP_BUTTON_SAVE, "offLabel", String(speedPulse.scaleFactor) + " / " + String(tachoPulse.scaleFactor));
   }
 }
 
@@ -176,8 +176,8 @@ BLYNK_WRITE(VP_BUTTON_SAVE)
   if (param.asInt() == 1)
   {
     preferences.begin("moto-meter", false);
-    preferences.putUInt("speedFreqRatio", pulse_speed.scaleFactor);
-    preferences.putUInt("revFreqRatio", pulse_tacho.scaleFactor);
+    preferences.putUInt("speedFreqRatio", speedPulse.scaleFactor);
+    preferences.putUInt("revFreqRatio", tachoPulse.scaleFactor);
     preferences.end();
     Serial.println("preferences saved.");
   }
@@ -194,23 +194,23 @@ void setup()
   Blynk.begin(auth);
 
   preferences.begin("moto-meter", true);
-  pulse_speed.scaleFactor = preferences.getUInt("speedFreqRatio", 135); // default scale factor of speed : 135 [mph/Hz]
-  pulse_tacho.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
+  speedPulse.scaleFactor = preferences.getUInt("speedFreqRatio", 135); // default scale factor of speed : 135 [mph/Hz]
+  tachoPulse.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
   preferences.end();
 
   // Make input pin HIGH by default
-  pinMode(inputPin_speed, INPUT_PULLUP);
-  pinMode(inputPin_tacho, INPUT_PULLUP);
-  pinMode(inputPin_neutral, INPUT_PULLUP);
+  pinMode(speedPin, INPUT_PULLUP);
+  pinMode(tachoPin, INPUT_PULLUP);
+  pinMode(neutralPin, INPUT_PULLUP);
 
   // Attach INT to our handler
-  attachInterrupt(digitalPinToInterrupt(inputPin_speed), calcFrequency_speed, RISING);
-  attachInterrupt(digitalPinToInterrupt(inputPin_tacho), calcFrequency_tacho, RISING);
-  attachInterrupt(digitalPinToInterrupt(inputPin_neutral), checkNeutral, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, RISING);
+  attachInterrupt(digitalPinToInterrupt(tachoPin), calcTachoFrequency, RISING);
+  attachInterrupt(digitalPinToInterrupt(neutralPin), checkNeutralState, CHANGE);
 
   timer.setInterval(100L, sendValue);
 
-  BLYNK_LOG("speedFreqRatio=%d\trevFreqRatio=%d\n", pulse_speed.scaleFactor, pulse_tacho.scaleFactor);
+  BLYNK_LOG("speedFreqRatio=%d\trevFreqRatio=%d\n", speedPulse.scaleFactor, tachoPulse.scaleFactor);
 }
 
 void loop()
