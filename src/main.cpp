@@ -20,7 +20,7 @@
 #define VP_GAUGE_SPEED V0
 #define VP_GAUGE_REV V1
 #define VP_VALUE_RATIO V2
-#define VP_VALUE_POSITION V3
+#define VP_VALUE_GEAR V3
 
 #define GEAR_NUM 5
 
@@ -102,8 +102,8 @@ void sendValue()
 
   if (isNeutral)
   {
-    Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_GREEN);
-    Blynk.virtualWrite(VP_VALUE_POSITION, "N");
+    Blynk.setProperty(VP_VALUE_GEAR, "color", BLYNK_GREEN);
+    Blynk.virtualWrite(VP_VALUE_GEAR, "N");
   }
   else
   {
@@ -112,16 +112,16 @@ void sendValue()
     {
       if (speedToRevRatio < (speedToRevRatioArray[i] + speedToRevRatioArray[i + 1]) / 2)
       {
-        Blynk.setProperty(VP_VALUE_POSITION, "color", "#888888");
-        Blynk.virtualWrite(VP_VALUE_POSITION, i + 1);
+        Blynk.setProperty(VP_VALUE_GEAR, "color", "#888888");
+        Blynk.virtualWrite(VP_VALUE_GEAR, i + 1);
         topGear = false;
         break;
       }
     }
     if (topGear)
     {
-      Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_YELLOW);
-      Blynk.virtualWrite(VP_VALUE_POSITION, GEAR_NUM);
+      Blynk.setProperty(VP_VALUE_GEAR, "color", BLYNK_YELLOW);
+      Blynk.virtualWrite(VP_VALUE_GEAR, GEAR_NUM);
     }
   }
 
@@ -140,10 +140,10 @@ BLYNK_CONNECTED()
   Blynk.virtualWrite(VP_GAUGE_REV, 0);
   // Blynk.virtualWrite(VP_GAUGE_REV, tachoPulse.scaleFactor);
   Blynk.virtualWrite(VP_VALUE_RATIO, "Connected");
-  Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_GREEN);
-  Blynk.virtualWrite(VP_VALUE_POSITION, "N");
-  // Blynk.setProperty(VP_VALUE_POSITION, "color", BLYNK_YELLOW);
-  // Blynk.virtualWrite(VP_VALUE_POSITION, GEAR_NUM);
+  Blynk.setProperty(VP_VALUE_GEAR, "color", BLYNK_GREEN);
+  Blynk.virtualWrite(VP_VALUE_GEAR, "N");
+  // Blynk.setProperty(VP_VALUE_GEAR, "color", BLYNK_YELLOW);
+  // Blynk.virtualWrite(VP_VALUE_GEAR, GEAR_NUM);
 
   delay(3000);
 
