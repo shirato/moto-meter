@@ -82,7 +82,7 @@ void IRAM_ATTR calcTachoFrequency()
 
 void IRAM_ATTR checkNeutralState()
 {
-  isNeutral = digitalRead(neutralPin);
+  isNeutral = !digitalRead(neutralPin);
 }
 
 void sendValue()
@@ -112,7 +112,7 @@ void sendValue()
     {
       if (speedToRevRatio < (speedToRevRatioArray[i] + speedToRevRatioArray[i + 1]) / 2)
       {
-        Blynk.setProperty(VP_VALUE_POSITION, "color", "#000000");
+        Blynk.setProperty(VP_VALUE_POSITION, "color", "#888888");
         Blynk.virtualWrite(VP_VALUE_POSITION, i + 1);
         topGear = false;
         break;
@@ -204,8 +204,8 @@ void setup()
   pinMode(neutralPin, INPUT_PULLUP);
 
   // Attach INT to our handler
-  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, RISING);
-  attachInterrupt(digitalPinToInterrupt(tachoPin), calcTachoFrequency, RISING);
+  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, FALLING);
+  attachInterrupt(digitalPinToInterrupt(tachoPin), calcTachoFrequency, FALLING);
   attachInterrupt(digitalPinToInterrupt(neutralPin), checkNeutralState, CHANGE);
 
   timer.setInterval(100L, sendValue);
