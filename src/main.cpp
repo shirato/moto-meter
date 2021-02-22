@@ -39,6 +39,7 @@ typedef struct
   float frequency;
   unsigned long prevTime;
   int scaleFactor;
+  int durationThreshold;
 } Pulse;
 
 Preferences preferences;
@@ -48,6 +49,8 @@ char auth[] = AUTH_TOKEN;
 
 // set speed-to-rev ratio for each shift position (speed / rev * 1000)
 const float speedToRevRatioArray[GEAR_NUM] = {5.010, 7.607, 9.958, 12.324, 14.189};
+const int maxSpeed = 170;
+const int maxRev = 13500;
 
 // the number of the signal input pin
 const int speedPin = 16;
@@ -56,8 +59,8 @@ const int neutralPin = 32;
 const int indicatorPin = 33;
 
 // We make these values volatile, as they are used in interrupt context
-volatile Pulse speedPulse = {0, 0, 1};
-volatile Pulse tachoPulse = {0, 0, 1};
+volatile Pulse speedPulse = {0, 0, 1, 500};
+volatile Pulse tachoPulse = {0, 0, 1, 500};
 volatile int isNeutral = false;
 
 void IRAM_ATTR calcSpeedFrequency()
@@ -65,7 +68,7 @@ void IRAM_ATTR calcSpeedFrequency()
   if (digitalRead(speedPin))
   {
     unsigned long currentTime = micros();
-    if ((currentTime - speedPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+    if ((currentTime - speedPulse.prevTime) > speedPulse.durationThreshold)
     {
       speedPulse.frequency = 1000000.0 / (currentTime - speedPulse.prevTime);
       speedPulse.prevTime = currentTime;
@@ -78,7 +81,7 @@ void IRAM_ATTR calcTachoFrequency()
   if (digitalRead(tachoPin))
   {
     unsigned long currentTime = micros();
-    if ((currentTime - tachoPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+    if ((currentTime - tachoPulse.prevTime) > tachoPulse.durationThreshold)
     {
       tachoPulse.frequency = 1000000.0 / (currentTime - tachoPulse.prevTime);
       tachoPulse.prevTime = currentTime;
@@ -204,6 +207,9 @@ void setup()
   tachoPulse.scaleFactor = preferences.getUInt("revFreqRatio", 30);    // default scale factor of rev : 30 [rpm/Hz]
   preferences.end();
 
+  speedPulse.durationThreshold = (speedPulse.scaleFactor * 10 / maxSpeed) * 100;
+  tachoPulse.durationThreshold = (tachoPulse.scaleFactor * 10000 / maxRev) * 100;
+
   // Make input pin HIGH by default
   pinMode(speedPin, INPUT_PULLUP);
   pinMode(tachoPin, INPUT_PULLUP);
@@ -217,6 +223,7 @@ void setup()
   timer.setInterval(100L, sendValue);
 
   BLYNK_LOG("speedFreqRatio=%d\trevFreqRatio=%d\n", speedPulse.scaleFactor, tachoPulse.scaleFactor);
+  BLYNK_LOG("speedThreshold=%d\trevThreshold=%d\n", speedPulse.durationThreshold, tachoPulse.durationThreshold);
 }
 
 void loop()
