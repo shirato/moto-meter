@@ -62,21 +62,27 @@ volatile int isNeutral = false;
 
 void IRAM_ATTR calcSpeedFrequency()
 {
-  unsigned long currentTime = micros();
-  if ((currentTime - speedPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+  if (digitalRead(speedPin))
   {
-    speedPulse.frequency = 1000000.0 / (currentTime - speedPulse.prevTime);
-    speedPulse.prevTime = currentTime;
+    unsigned long currentTime = micros();
+    if ((currentTime - speedPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+    {
+      speedPulse.frequency = 1000000.0 / (currentTime - speedPulse.prevTime);
+      speedPulse.prevTime = currentTime;
+    }
   }
 }
 
 void IRAM_ATTR calcTachoFrequency()
 {
-  unsigned long currentTime = micros();
-  if ((currentTime - tachoPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+  if (digitalRead(tachoPin))
   {
-    tachoPulse.frequency = 1000000.0 / (currentTime - tachoPulse.prevTime);
-    tachoPulse.prevTime = currentTime;
+    unsigned long currentTime = micros();
+    if ((currentTime - tachoPulse.prevTime) > 500) // if wave length is less than 500 us, regarded as noise.
+    {
+      tachoPulse.frequency = 1000000.0 / (currentTime - tachoPulse.prevTime);
+      tachoPulse.prevTime = currentTime;
+    }
   }
 }
 
@@ -204,8 +210,8 @@ void setup()
   pinMode(neutralPin, INPUT_PULLUP);
 
   // Attach INT to our handler
-  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, FALLING);
-  attachInterrupt(digitalPinToInterrupt(tachoPin), calcTachoFrequency, FALLING);
+  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, RISING);
+  attachInterrupt(digitalPinToInterrupt(tachoPin), calcTachoFrequency, RISING);
   attachInterrupt(digitalPinToInterrupt(neutralPin), checkNeutralState, CHANGE);
 
   timer.setInterval(100L, sendValue);
