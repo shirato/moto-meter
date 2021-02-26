@@ -62,6 +62,7 @@ const int indicatorPin = 33;
 volatile Pulse speedPulse = {0, 0, 1, 500};
 volatile Pulse tachoPulse = {0, 0, 1, 500};
 volatile int isNeutral = false;
+volatile boolean indicatorState = false;
 
 void IRAM_ATTR calcSpeedFrequency()
 {
@@ -113,6 +114,11 @@ void sendValue()
   {
     Blynk.setProperty(VP_VALUE_GEAR, "color", BLYNK_GREEN);
     Blynk.virtualWrite(VP_VALUE_GEAR, "N");
+    // if (indicatorState)
+    // {
+      digitalWrite(indicatorPin, LOW);
+    //   indicatorState = !indicatorState;
+    // }
   }
   else
   {
@@ -124,6 +130,11 @@ void sendValue()
         Blynk.setProperty(VP_VALUE_GEAR, "color", "#888888");
         Blynk.virtualWrite(VP_VALUE_GEAR, i + 1);
         topGear = false;
+        // if (indicatorState)
+        // {
+          digitalWrite(indicatorPin, LOW);
+          // indicatorState = !indicatorState;
+        // }
         break;
       }
     }
@@ -131,6 +142,11 @@ void sendValue()
     {
       Blynk.setProperty(VP_VALUE_GEAR, "color", BLYNK_YELLOW);
       Blynk.virtualWrite(VP_VALUE_GEAR, GEAR_NUM);
+      // if (!indicatorState)
+      // {
+        digitalWrite(indicatorPin, HIGH);
+      //   indicatorState = !indicatorState;
+      // }
     }
   }
 
@@ -214,6 +230,8 @@ void setup()
   pinMode(speedPin, INPUT_PULLUP);
   pinMode(tachoPin, INPUT_PULLUP);
   pinMode(neutralPin, INPUT_PULLUP);
+
+  pinMode(indicatorPin, OUTPUT);
 
   // Attach INT to our handler
   attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, RISING);
