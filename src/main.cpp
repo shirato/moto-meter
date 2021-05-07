@@ -236,7 +236,7 @@ void setup()
   pinMode(indicatorPin, OUTPUT);
 
   // Attach INT to our handler
-  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, RISING);
+  attachInterrupt(digitalPinToInterrupt(speedPin), calcSpeedFrequency, FALLING);
   attachInterrupt(digitalPinToInterrupt(tachoPin), calcTachoFrequency, RISING);
   attachInterrupt(digitalPinToInterrupt(neutralPin), checkNeutralState, CHANGE);
 
